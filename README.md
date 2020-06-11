@@ -1,6 +1,7 @@
 #### HNGi7 Stage One Task
 
 This is my python version for the current HNGi7 internship program currently going on.
+Original code written in php.
 
 Included:
 
