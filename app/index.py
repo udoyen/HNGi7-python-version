@@ -4,6 +4,7 @@ import re
 from collections import OrderedDict
 import json
 import itertools
+from flask import Flask, render_template, make_response, request, jsonify
 
 # regex code
 """
@@ -28,6 +29,8 @@ json_data = []
 
 # return value from function
 output_results = OrderedDict()
+
+app = Flask(__name__)
 
 
 def check_info(test_regex: str, user_output: str) -> str:
@@ -124,5 +127,38 @@ def process_users() -> list:
     return json_data
 
 
+@app.route('/', methods=['GET'])
+@app.route('/home', methods=['GET'])
+@app.route('/index', methods=['GET'])
+def index():
+    """
+    Landing page function
+    :return:
+    """
+    if 'json' in request.args:
+        data = process_users()
+        return jsonify(message=data)
+    else:
+        return render_template('index.html')
+
+
+@app.errorhandler(404)
+def not_found():
+    """Page not found."""
+    return make_response(render_template("404.html"), 404)
+
+
+@app.errorhandler(400)
+def bad_request():
+    """Bad request."""
+    return make_response(render_template("400.html"), 400)
+
+
+@app.errorhandler(500)
+def server_error():
+    """Internal server error."""
+    return make_response(render_template("500.html"), 500)
+
+
 if __name__ == '__main__':
-    process_users()
+    app.run(debug=True)
