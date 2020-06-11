@@ -3,6 +3,7 @@ import subprocess
 import re
 from collections import OrderedDict
 import json
+import itertools
 
 # regex code
 """
@@ -63,68 +64,46 @@ def process_users() -> list:
         '.java': 0,
         '.py': 0
     }
-    error_files = []
     dir_name = os.path.dirname(__file__)
     r_path = os.path.realpath(dir_name + '/scripts')
     target = r_path
-    # TODO remove these lines
-    print('Dirname: {}'.format(dir_name))
-    print('Location: {}'.format(r_path))
-    print('Target: {}'.format(target))
+    counter = itertools.count(0)
     try:
         # Get files in scripts folder
         files = [f for f in os.listdir(target) if os.path.isfile(os.path.join(target, f))]
         for f in files:
             # Get file extension
             file_extension = os.path.splitext(f)
+            lang_count[file_extension[1]] += 1
             # TODO remove these lines
-            # print('====================================')
             # print('File extension: {}'.format(str(file_extension[1])))
             # print('File: {}'.format(f))
             # print('Fullpath to file: {}'.format(os.path.abspath('scripts/' + f)))
             f_path = r_path + '/' + f
-            if file_extension[1] in run_command.keys():
-                # Update the language count dict
-                lang_count[file_extension[1]] += 1
-                # Run the command and get the output
-                # TODO Remove
-                # print('Command: {}'.format(run_command[file_extension[1]]))
-                proc = subprocess.run([run_command[file_extension[1]], f_path], stdout=subprocess.PIPE, bufsize=0)
-                # change output to string
-                proc_str = proc.stdout.decode('utf-8').rstrip("\n")
-                # Make sure the out meets the required string format
-                if check_info(output, proc_str) == '' and check_info(email, proc_str) == '':
-                    print('Error in User script')
-                    error_files.append(f_path)
-                    # setup the dict result
-                    json_data.append(OrderedDict(
-                        {
-                            'file': f,
-                            'output': proc.stdout.decode('utf-8').rstrip("\n"),
-                            'email': check_info(email, proc_str),
-                            'fullname': check_info(names, proc_str),
-                            'HNGId': check_info(hng_id, proc_str),
-                            'language': check_info(language, proc_str),
-                            'status': 'Fail'
-                        }
-                    ))
-                else:
-                    print('Output: {}'.format(proc.stdout.decode('utf-8')), flush=True)
-                    # setup the dict result
-                    json_data.append(OrderedDict(
-                        {
-                            'file': f,
-                            'output': proc.stdout.decode('utf-8').rstrip("\n"),
-                            'email': check_info(email, proc_str),
-                            'fullname': check_info(names, proc_str),
-                            'HNGId': check_info(hng_id, proc_str),
-                            'language': check_info(language, proc_str),
-                            'status': 'Pass'
-                        }
-                    ))
-            # TODO remove these line
-            # print('====================================')
-        return json_data
+            proc_str = [subprocess.run([run_command[file_extension[1]], f_path], stdout=subprocess.PIPE,
+                                       bufsize=0).stdout.decode('utf-8').replace('\n', '').rstrip() if file_extension[
+                                                                                                           1] in run_command.keys() else 'Nothing']
+            print('Output Str: {}'.format(proc_str[0]), flush=True)
+            # Unpack the list of dict created earlier
+            # and append them to the json_data list
+            json_data.append(*[OrderedDict({
+                'file': f,
+                'output': proc_str[0],
+                'email': check_info(email, proc_str[0]),
+                'fullname': check_info(names, proc_str[0]),
+                'HNGId': check_info(hng_id, proc_str[0]),
+                'language': check_info(language, proc_str[0]),
+                'status': 'Fail'
+            }) if check_info(output, proc_str[0]) == '' or check_info(email, proc_str[0]) == '' else
+                               OrderedDict({
+                                   'file': f,
+                                   'output': proc_str[0],
+                                   'email': check_info(email, proc_str[0]),
+                                   'fullname': check_info(names, proc_str[0]),
+                                   'HNGId': check_info(hng_id, proc_str[0]),
+                                   'language': check_info(language, proc_str[0]),
+                                   'status': 'Pass'
+                               })])
     except TypeError as t_err:
         print('Error: {}'.format(t_err))
     except ValueError as v_err:
@@ -136,14 +115,13 @@ def process_users() -> list:
     except Exception as e_err:
         print('Error Type: {}, msg: {}'.format(type(e_err), e_err))
     finally:
-        # print(for i in json_data)
+        error_files = [next(counter, i) for i in json_data if i['status'] == 'Fail']
         print('json_data items: {}'.format(json.dumps(json_data, indent=4)))
-        print('Error files: {}'.format(error_files))
-        print('Total files count: {}'.format(len(files)))
-        print('Files processed: {}'.format(len(files) - len(error_files)))
-        print('Files not processed: {}'.format(len(error_files)))
-        print('Scripts count: {}'.format(lang_count['.js']), 'Java count: {}'.format(lang_count['.java']),
+        print('Files processed: {}'.format(len(files)), 'Script Success: {}'.format(len(files) - error_files[-1]),
+              'Script Fails: {}'.format(error_files[-1]), sep='\n')
+        print('JavaScripts count: {}'.format(lang_count['.js']), 'Java count: {}'.format(lang_count['.java']),
               'Php count: {}'.format(lang_count['.php']), 'Python count: {}'.format(lang_count['.py']))
+    return json_data
 
 
 if __name__ == '__main__':
