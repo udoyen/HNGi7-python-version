@@ -133,30 +133,42 @@ def process_users() -> list:
 def index():
     """
     Landing page function
-    :return:
+    :return: either a json response or the index.html page
     """
+    data = process_users()
     if 'json' in request.args:
-        data = process_users()
-        return jsonify(message=data)
+        return jsonify(data)
     else:
-        return render_template('index.html')
+        return render_template('index.html', data=data)
 
 
 @app.errorhandler(404)
-def not_found():
-    """Page not found."""
+def not_found(e):
+    """
+    Page Not Found
+    :param e:
+    :return: response 404 and the 404.html page
+    """
     return make_response(render_template("404.html"), 404)
 
 
-@app.errorhandler(400)
-def bad_request():
-    """Bad request."""
-    return make_response(render_template("400.html"), 400)
+@app.errorhandler(405)
+def bad_request(e):
+    """
+    Method not allowed
+    :param e:
+    :return: response 405 and the 405.html page
+    """
+    return make_response(render_template("405.html"), 405)
 
 
 @app.errorhandler(500)
-def server_error():
-    """Internal server error."""
+def server_error(e):
+    """
+    Internal Server Error
+    :param e:
+    :return: response 505 and the 505.html page
+    """
     return make_response(render_template("500.html"), 500)
 
 
