@@ -19,7 +19,7 @@ print(test.group(1)) if type(test) else print('Failed')
 """
 
 email = "^.+and\s+([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+).*$"
-names = "^Hello\s*World,\s.+is\s*([\w\s-]*)\swith.*"
+names = "^Hello\s*World,\sthis\s+is\s+([\w\s-]*)\s+with.*"
 hng_id = "^Hello\s*World,\s.+ID\s(HNG-\d{5})"
 language = "^Hello\s*World,\s.+using\s(\w+)"
 output = "^Hello\sWorld,\s+this\s+is\s+[\w\s-]+with\s+HNGi7\s+ID\s+HNG-\d{5}\s+using\s+\w+\s+for\s+stage\s+2\s+task\s+and\s+[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+[\.|\s]*$"
@@ -117,13 +117,13 @@ def process_users() -> list:
         print('Error: {}'.format(sc_err))
     except Exception as e_err:
         print('Error Type: {}, msg: {}'.format(type(e_err), e_err))
-    finally:
-        error_files = [next(counter, i) for i in json_data if i['status'] == 'Fail']
-        print('json_data items: {}'.format(json.dumps(json_data, indent=4)))
-        print('Files processed: {}'.format(len(files)), 'Script Success: {}'.format(len(files) - error_files[-1]),
-              'Script Fails: {}'.format(error_files[-1]), sep='\n')
-        print('JavaScripts count: {}'.format(lang_count['.js']), 'Java count: {}'.format(lang_count['.java']),
-              'Php count: {}'.format(lang_count['.php']), 'Python count: {}'.format(lang_count['.py']))
+    # finally:
+    error_files = [next(counter, i) for i in json_data if i['status'] == 'Fail']
+    print('json_data items: {}'.format(json.dumps(json_data, indent=4)))
+    print('Files processed: {}'.format(len(files)), 'Script Success: {}'.format(len(files) - error_files[-1]),
+          'Script Fails: {}'.format(error_files[-1]), sep='\n')
+    print('JavaScripts count: {}'.format(lang_count['.js']), 'Java count: {}'.format(lang_count['.java']),
+          'Php count: {}'.format(lang_count['.php']), 'Python count: {}'.format(lang_count['.py']))
     return json_data
 
 
