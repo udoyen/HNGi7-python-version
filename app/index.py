@@ -34,7 +34,6 @@ json_data = []
 output_results = OrderedDict()
 
 
-
 def check_info(test_regex: str, user_output: str) -> str:
     """
     Used to confirm user information
@@ -155,16 +154,29 @@ def index():
     # app.app_context().push()
     if 'json' in request.args:
         def generate():
+            """
+            A lagging generator to stream JSON so we don't have to hold everything in memory
+            This is a little tricky, as we need to omit the last comma to make valid JSON,
+            thus we use a lagging generator, similar to http://stackoverflow.com/questions/1630320/
+            See: https://blog.al4.co.nz/2016/01/streaming-json-with-flask/
+            :return: Flask Response object
+            """
             try:
+                # get first result
                 prev_release = next(data)
             except StopIteration:
+                # StopIteration here means the length was zero, so yield a valid data doc and stop
                 yield '[]'
                 raise StopIteration
+            # StopIteration here means the length was zero, so yield a valid data doc and stop
             yield '['
+            # Iterate over the data
             for item in data:
                 yield json.dumps(prev_release) + ', '
                 prev_release = item
+            # Now yield the last iteration without comma but with the closing brackets
             yield json.dumps(prev_release) + ']'
+
         return Response(generate(), content_type='application/json')
     else:
         return Response(stream_template('index.html', data=data))

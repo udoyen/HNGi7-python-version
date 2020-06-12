@@ -41,6 +41,12 @@ class MyTestCase(unittest.TestCase):
             rx = c.get('/?json')
 
         assert rx.status_code == 200
+        assert 'file' in rx.get_data(as_text=True)
+        assert 'output' in rx.get_data(as_text=True)
+        assert 'email' in rx.get_data(as_text=True)
+        assert 'HNGId' in rx.get_data(as_text=True)
+        assert 'language' in rx.get_data(as_text=True)
+        assert 'status' in rx.get_data(as_text=True)
         assert rx.content_type == 'application/json'
 
     def test_404_error(self):
