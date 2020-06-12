@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (extras.classList.contains("collapsed")) {
+            expandcollapse.classList.add("expander")
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    sort_column(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+
+        if (key_a == key_b) return 0;
+
+        if (reversed) {
+            return (key_a < key_b ? 1 : -1);
+        } else {
+            return (key_a > key_b ? 1 : -1);
+        }
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 12-Jun-2020 at 21:00:22 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v2.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>/home/george/.sdkman/candidates/java/current</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.8.1", "pytest": "5.4.3"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Linux-5.3.0-59-generic-x86_64-with-Ubuntu-18.04-bionic</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "2.1.1", "metadata": "1.9.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.6.9</td></tr></table>
+    <h2>Summary</h2>
+    <p>12 tests ran in 5.94 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">12 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_another_email_fail</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_email</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_email_fail</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_hng_id</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_hng_id_fail</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_language</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_main_fail</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_main_for_leading_newlines</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_main_pass</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_name_fail</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_names</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_user_info.py::MyTestCase::test_process_users</td>
+          <td class="col-duration">5.78</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Output Str: Hello World, this is Obaro Oludayo with HNGi7 ID HNG-03457 using javaScript for stage 2 task and obarodayo@gmail.com
+Output Str: Hello World, this is Akinwande Obiti with HNGi7 ID HNG-01255 using Javascript for stage 2 task and obitiakinwandeno1@gmail.com
+Output Str: Hello World, this is Akinloluwa Adeleye with HNGi7 ID HNG-00898 using javaScript for stage 2 task and akinloluwaa@yahoo.com
+Output Str: Hello World, this is Gabriel Ifgoa with HNGi7 ID 02808 using PHP for stage 2 task and gabrielifoga@yahoo.com
+Output Str: Hello World, this is Etima Essien with HNGi7 ID HNG-05954 using Javascript for stage 2 task and essienetima1@gmail.com
+Output Str: Hello World, this is Toya Amechi with HNGi7 ID HNG-05516 using Javascript for stage 2 task and toya.amechi@gmail.com
+Output Str: Hello World, this is Peace Faleke with HNGi7 ID HNG-01464 using PHP for stage 2 task and peaceaanu247@gmail.com
+Output Str: Hello World, this is JAMIU Abdulhafeez with HNGi7 ID HNG-02008 using python for stage 2 task and jamiuwale20@gmail.com
+Output Str: Hello World this is Eboreime Ikhazuangbe with HNGi7 ID HNG-00988 using python for stage 2 task and ikdboy_2011@yahoo.com
+Output Str: Hello World, this is Adegbola Simeon with HNGi7 ID HNG-02271 using JavaScript for stage 2 task and adegbolasimeon@gmail.com
+Output Str: Hello World, this is Princewill Jackson with HNGi7 ID HNG-05290 using Python for stage 2 task and princewilljackson@ymail.com
+Output Str: Hello World, this is Obasi Basil with HNGi7 ID HNG-02505 using JavaScript for stage 2 task and obasibas260@gmail.com
+Output Str: Hello World, this is Yusuf Sodiq with HNGi7 ID HNG-02857 using python for stage 2 task and yusufsodiq22@gmail.com
+Output Str: Hello World, this is Victor Mba with HNGi7 ID HNG-02691 using python for stage 2 task and kalumba366@gmail.com
+Output Str: Hello World, this is Akeem Agbaje with HNGi7 ID HNG-03992 using Javascript for stage 2 task and agbajeolawale@outlook.com
+Output Str: Hello World, this is Nneka Karen with HNGi7 ID HNG-220202029920 using Javascript for stage 2 task and karenenumah@gmail.com
+Output Str: Hello World, this is Bankole Awwal with HNGi7 ID HNG-00537 using Javascript for stage 2 task and awwalbankole@gmail.com.
+Output Str: Hello World, this is Ifeoluwa Adefioye with HNGi7 ID HNG-01833 using python for stage 2 task and ilieas300@gmail.com
+Output Str: Hello World, this is Praise Odeyemi with HNGi7 ID HNG-05451 using Python for stage 2 task and boluwatifeodeyemi@gmail.com
+Output Str: Hello World, this is Lateefat Onaolapo with HNGi7 ID HNG-04514 using JavaScript for stage 2 task and onaolapolateefah@gmail.com
+Output Str: Hello World, this is Ade Jinadu with HNGi7 ID HNG-00217 using PHP for stage 2 task and ade@techplus.com.ng
+Output Str: Hello World, this is Kabir Abdulsalam with HNGi7 ID HNG-05020 using Javascript for stage 2 task and abdulsalamkabir99@gmail.com
+Output Str: Hello World, this is Okafor Somtochukwu Emmanuel with HNGi7 ID HNG-01771 using php for stage 2 task and sommy.okafor@yahoo.com
+Output Str: Hello World, this is Jane Essien with HNGi7 ID HNG-03386 using JavaScript for stage 2 task and jayneessien@gmail.com.
+Output Str: Hello World, this is Joseph Bassey with HNGi7 ID HNG-02360 using PHP for stage 2 task and Joemires20@yahoo.com
+Output Str: Hello World, this is Kenway King with HNGi7 ID HNG-00299 using PHP for stage 2 task and kingkenway16@gmail.com
+Output Str: Hello World, this is Udoh Faith with HNGi7 ID HNG-05995 using Javascript for stage 2 task and faithudoh71@gmail.com
+Output Str: Hello World, this is Gabriella Amaefule with HNGi7 ID HNG-02535 using javascript for stage 2 task and  gabbieamah49@gmail.com
+Output Str: Hello World, this is Omobola Wayne Lawal with HNGi7 ID HNG-06166 using Javascript for stage 2 task and omobolalawal6@gmail.com
+Output Str: Hello World, this is Oladayo Egbeyemi with HNGi7 ID HNG-00535 using JavaScript for stage 2 task and dasther@outlook.com
+Output Str: Hello World, this is Emmanuel Omeogah with HNGi7 ID HNG-02861 using Python for stage 2 task and email chinedue16@gmail.com
+Output Str: Hello World, this is Anas Ibrahim with HNGi7 ID HNG-04220 using python for stage 2 task and anas.falau@gmail.com
+Output Str: Hello World, this is Oni Emmanuel Temitope with HNGi7 ID HNG-03120 using Javascript for stage 2 task and oniemmanuel90@gmail.com
+Output Str: Hello World, this is Enobong Umoette with HNGi7 ID HNG-01040 using python for stage 2 task and eno.umoette@gmail.com
+Output Str: Hello World, this is Nelson Chinedu with HNGi7 ID HNG-04904 using javaScript for stage 2 task and egwuchinedu69@gmail.com
+Output Str: Hello World, this is Oyewale Tayo with HNGi7 ID HNG-03316 using JavaScript for stage 2 task and tayooyewale@gmail.com
+Output Str: Hello World, this is Oladokun Seni with HNGi7 ID HNG-04250 using Javascript for stage 2 task  and senioladokun44@gmail.com
+Output Str: Hello World, this is Micahel Olusoji with HNGi7 ID HNG-04964 using python for stage 2 task and olusoji200@gmail.com
+Output Str: Hello World, this is Abdulmatin Adeniji with HNGi7 ID HNG-04536 using JavaScript for stage 2 task and abdulmatinadeniji@gmail.com
+Output Str: Hello World, this is Usman Soliu with HNGi7 ID HNG-06665 using PHP for stage 2 task and fresher.dev01@gmail.com
+Output Str: Hello World, this is Ifebhor Nonse with HNGi7 ID HNG-04707 using Javascript for stage 2 task and nonseifebhor@gmail.com
+Output Str: Hello World, this is Frances Oparaocha with HNGi7 ID HNG-00114 using Javascript for stage 2 task and francesoparaocha@gmail.com
+Output Str: Hello World, this is Ugbotor Emmanuel with HNGi7 ID HNG-03845 using javascript for stage 2 task and emmanuelugbotor@gmail.com
+Output Str: Hello World, this is Amoo Daniel with HNGi7 ID HNG-02816 using Python for stage 2 task and danielamoo35@gmail.com
+Output Str: Hello World, this is Mohamed Ali with HNGi7 ID HNG-05487 using Python for stage 2 task and alaricdemahom11@gmail.com
+Output Str: Hello World, this is Herbert Olinga  with HNGi7 ID HNG-03838 using Javascript for stage 2 task and email tikewilly@gmail.com
+Output Str: 
+Output Str: Hello World, this is Okolie Samuelwith HNGi7 ID HNG-06795using Javascriptfor stage 2 task and uche7877@gmail.com
+Output Str: Hello World, this is Stephen Oyebanji with HNGi7 ID HNG-00014 using javascript for stage 2 task and seyioyebanjistephen@gmail.com
+Output Str: Hello World, this is Sanusi Razaq with HNGi7 ID HNG-02064 using JavaScript for stage 2 task and softinputcode@gmail.com
+Output Str: 
+Output Str:  Hello World, this is Chidubem Onyeukwu with HNGi7 ID HNG-03733 using Javascript for stage 2 task and onyeukwuchidubemclinton@gmail.com
+Output Str: Hello World, this is Balogun Lukman with HNGi7 ID HNG-01022 using Javascript for stage 2 task and lukheebalo@gmail.com
+Output Str: Hello World, this is Osahon Bethel with HNGi7 ID HNG-05125 and email bethelosahon@gmail.com using Javascript for stage 2 task and bethelosahon@gmail.com
+Output Str: Hello World, this is Malomo Okikioluwa with HNGi7 ID HNG-01674 using javascript for stage 2 task
+Output Str: Hello World, this is Chidi Arua with HNGi7 ID HNG-05000 using Python for stage 2 task and chidiarua99@gmail.com
+Output Str: Hello World, this is Adeleye Abdulbasit with HNGi7 ID HNG-00429 using Javascript for stage 2 task and adeleyeabdulbasit@gmail.com
+Output Str: Hello World, this is Abdulrahman Olagunju with HNGi7 ID HNG-01553 using JavaScript for stage 2 task and abdulrahmanolagunju.1@gmail.com
+Output Str: Hello World, this is Muhammad Ibrahim with HNGi7 ID HNG-05713 using javascript for stage 2 task and muhdibee@gmail.com
+Output Str: Hello World, this is Francis Adegbe with HNGi7 ID HNG-00130 using JavaScript for stage 2 task and Francismission61@gmail.com
+Output Str: Hello World, this is Emmanuel Idoko with HNGi7 ID HNG-00247 using JavaScript for stage 2 task and pidox31102002@gmail.com
+Output Str: Hello World, this is Davidson Ayo with HNGi7 ID HNG-06359 using javascript for stage 2 task and davidbrain162@gmail.com
+Output Str: Hello World, this is Oluwatobiloba Okekunle with HNGi7 ID HNG-01385 using javascript for stage 2 task and okekunletobi@gmail.com
+Output Str: Hello World, this is Collins Wilson with HNGi7 ID HNG-04747 using Python for stage 2 task and wilsoncollins44@yahoo.com
+Output Str: Hello World, this is Doken Edgar with HNGi7 ID HNG-03938 using Javascript for stage 2 task and dokenedgarjr@gmail.com
+Output Str: Hello World, this is David Alenoghena with HNGi7 ID HNG-05232 using Javascript for stage 2 task and davidalenoghena@gmail.com
+Output Str: Hello World, this is Ridwan Olanrewaju with HNGi7 ID HNG-04024 using JavaScript for stage 2 task and olaitanlanre28@gmail.com
+Output Str: Hello World, this is Abdullahi Musa with HNGi7 ID HNG-01532 using Javascript for stage 2 task and moosaabdullahi45@gmail.com
+Output Str: 
+Output Str: Hello World, this is Obaje Phoebe with HNGi7 ID HNG-03935 using Javascript for stage 2 task and obajephoebe@gmail.com
+Output Str: Hello World, this is Idris Olubisi with HNGi7 ID HNG-01329 using javascript for stage 2 task and heedris2olubisi@gmail.com
+Output Str: Hello World, this is Agharaye Emmanuel with HNGi7 ID HNG-03441 using javascript for stage 2 task and agharayee@gmail.com
+Output Str: Hello World, this is Justice Obioha with HNGi7 ID HNG-02883 using JavaScript for stage 2 task and obiohajustiamimbus@gmail.com
+Output Str: Hello World, this is Mike Udoh with HNGi7 ID HNG-03524 using Javascript for stage 2 task and miceuud@gmail.com
+Output Str: Hello World, this is Shaphan Zirra with HNGi7 ID HNG-05110 using JavaScript for stage 2 task and francisshaphan@gmail.comHello World, this is Shaphan Zirra with HNGi7 ID HNG-05110 using JavaScript for stage 2 task and francisshaphan@gmail.com
+Output Str: Hello World, this is Onwuka Kelvin with HNGi7 ID HNG-06274 using javascript for stage 2 task and my email is hax0r3dg3@gmail.com
+Output Str: Hello World, this is kenneth Akpan with HNGi7 ID HNG-05471 using PHP for stage 2 task and kenneyg50@gmail.com
+Output Str: Hello World, this is Tumininu Ijabadeniyi with HNGi7 ID HNG-06228 using python for stage 2 task and tumininuadeniyi@gmail.com
+Output Str: Hello World, this is Okolo Nathan with HNGi7 ID HNG-05788 using Python for stage 2 task and okolonathanchinedu@gmail.com
+Output Str: Hello World, this is Ukeje Amarachi with HNGi7 ID HNG-02625 using JavaScript for stage 2 task and ukejeamarajovita@gmail.com
+Output Str: Hello World, this is Jesse Okoro with HNGi7 ID HNG-00061 using javascript for stage 2 task and okorojesse@gmail.comokorojesse@gmail.com
+Output Str: Hello World, this is Marvellous Michaels with HNGi7 ID HNG-06741 using Javascript for stage 2 task and marvellousmikez@gmail.com
+Output Str: Hello World, this is Ovu Samuel with HNGi7 ID HNG-03196 using JavaScript for stage 2 task and ovusamuel@gmail.com
+Output Str: Hello World, this is Ugwuoke Ozioma with HNGi7 ID HNG-00610 using JavaScript for stage 2 task and oziomaonyishi4@gmail.com
+Output Str: Hello World, this is Mikail Yusuf with HNGi7 ID HNG-02327 using PHP for stage 2 task and mikaeelkyusuf@gmail.com
+Output Str: Hello World, this is Mudalue Emeka with HNGi7 ID HNG-01029 using javascript for stage 2 task and emekachristian511@gmail.com
+Output Str: Hello World, this is Nwokocha Hannah with HNGi7 ID HNG-01883 using Javascript for stage 2 task and my email is nwokochahannah@gmail.com
+Output Str: Hello World, this is Ayoola Olayiwola with HNGi7 ID HNG-06411 using PHP for stage 2 task and ayoola2906@gmail.com
+Output Str: Hello World, this is Ledisi Zabbey with HNGi7 ID HNG-01980 using Javascript for stage 2 task and ledisizab@gmail.com
+Output Str: Hello World, this is Samuel Amagbakhen with HNGi7 ID HNG-00558 using JavaScript for stage 2 task and amagbakhensamuel@gmail.com
+Output Str: Hello World, this is Akande Emmanuel with HNGi7 ID HNG-05918 using JavaScript for stage 2 task and akandeemmanuel1993@gmail.com
+Output Str: Hello World, this is Michael Eferemo with HNGi7 ID HNG -05538 using python for stage 2 task and my email is meferemo@gmail.com
+Output Str: Hello World, this is Eboreime Ikhazuangbe with HNGi7 ID HNG-00988 using python for stage 2 task and ikdboy_2011@yahoo.com
+Output Str: Hello World, this is Onwuka Chidumga with HNGi7 ID HNG-06529 using javascript for stage 2 task and my email is kelvinonwuka8@gmail.com
+Output Str: Hello World, this is Mudiaga Omene with HNGi7 ID HNG-05952 using Python for stage 2 task and omene.mudiaga@gmail.com
+Output Str: Hello World, this is Lilian Ovrawah with HNGi7 ID HNG-03716 using PHP for stage 2 task and this is my email address lilianovrawah@gmail.com
+Output Str: Hello World, this is Yahaya Kehinde with HNGi7 ID HNG-01939 using javascript for stage 2 task  and y.hkehinde@yahoo.com
+Output Str: Hello World, this is Victor Ayodeji Ogundola with HNGi7 ID HNG-03102 using Python for stage 2 task and dvicxy@gmail.com
+Output Str: Hello World, this is Akpan Abraham with HNGi7 ID HNG-01927 using JavaScript for stage 2 task and akpjunio4real@gmail.com.
+Output Str: Hello World, this is Okonkwo Miracle with HNGi7 ID HNG-05715 using javascript for stage 2 task and dev.okonkwoflair@gmail.com
+Output Str: Hello World, this is Samuel Olaegbe with HNGi7 ID HNG-05170 using PHP for stage 2 task and olaegbesamuel@gmail.com
+Output Str: Hello World, This is Asaaju Olalekan with HNGi7 ID HNG-05813 and email asaajulekan@gmail.com using python for stage 2 task
+Output Str: Hello World, this is Izuchukwu Iwuchuckwu with HNGi7 ID HNG-01559 using Javascript for stage 2 task and izuchuksiwuh@yahoo.com
+Output Str: Hello World, this is Ipoola Peter with HNGi7 ID HNG-02619 using Javascript for stage 2 task and peteripoola@yahoo.com
+Output Str: Hello World, this is Oke Oluwatobi with HNGi7 ID HNG-02356 using javascript for stage 2 task and akanji4destiny@gmail.com
+Output Str: Hello World, this is Atiku Uthman with HNGi7 ID HNG-05273 using python for stage 2 task and dmejii@outlook.com
+Output Str: Hello World, this is Tijani Muhammed lawal with HNGi7 ID HNG-03379 using javaScript for stage 2 task and janilawy@gmail.com
+Output Str: Hello World, this is Shittu Akeem with HNGi7 ID HNG-00268 using JavaScript for stage 2 task and writeshittu@gmail.com
+Output Str: Hello World, this is Peter Erinfolami with HNGi7 ID HNG-02073 using Python for stage 2 task and petersp2000@gmail.com
+Output Str: Hello World, this is Onyedikachi Ibeabuchi with HNGi7 ID HNG-04135 using JavaScript for stage 2 task and ibeabuchionyedikachii@gmail.com
+Output Str: Hello World, this is Moba Melvis Ringnyu with HNGi7 ID HNG-02763 using javascript for stage 2 task and ringnyum@gmail.com
+Output Str: Hello World, this is Olumuyiwa Akanni with HNGi7 ID HNG-03417 using JavaScript for stage 2 task and akannimuyiwa@gmail.com
+Output Str: Hello World, this is Abdulrasheed Lawal with HNGi7 ID HNG-03240 using python for stage 2 task and lawalabdulrasheedbolaji@gmail.com
+Output Str: Hello World, this is Abdullahi Abdul with HNGi7 ID HNG-00909 using PHP for stage 2 task and sendabdulmail@gmail.com
+Output Str: Hello World, this is Manzi Asifiwe with HNGi7 ID HNG-05507 using JavaScript for stage 2 task and asifiwemanzi@gmail.com
+Output Str: Hello World, this is Ahmed Mansour with HNGi7 ID HNG-01489 using javascript for stage 2 task and email moodfactor@gmail.com
+Output Str: Hello World, this is Abisoye Akinloye with HNGi7 ID HNG-02078 using Javascript for stage 2 task and my email is abisoyeakinloye@gmail.com
+Output Str: Hello World, this is Mayokun Adeniyi with HNGi7 ID HNG-01525 using Python for stage 2 task and adeniyimayokun17@gmail.com
+Output Str: Hello World, this is Toju Izuabgala with HNGi7 ID HNG-02401 using JavaScript for stage 2 task and intrepidjayson@gmail.com
+Output Str: Hello World, this is Remonah Makwata with HNGi7 ID HNG-01973 using JavaScript for stage 2 task and email mainaremmy294@gmail.com
+Output Str: Hello World, this is Douglas Hozea with HNGi7 ID HNG-03324 using Python for stage 2 task and kabuyedouglas53@gmail.com
+Output Str: Hello World, this is Bello Oluwatimilehin with HNGi7 ID HNG-02144 using JavaScript for stage 2 task and my email is emmmatimmybello@gmail.com
+Output Str: Hello World, this is Obah Lateo Frederick with HNGi7 ID HNG-04973 using Python for stage 2 task and lateofrederick@gmail.com
+Output Str: Hello World, this is Ndifreke Asuquo with HNGi7 ID HNG-05639 using Python for stage 2 task and asuquondifreke06@gmail.com
+Output Str: Hello World, this is Miracle Ozukalu with HNGi7 ID HNG-03127 using javascript for stage 2 task and miraclekalu1212@gmail.com
+Output Str: &lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;Hello world! &lt;br&gt;This is Ade Jinadu, with with HNGi7 ID 00217 using PHP for stage 2 task and ade@techplus.com.ng &lt;/body&gt;&lt;/html&gt;
+Output Str: Hello World, this is Philippa Olomoro with HNGi7 ID HNG-04602 using JavaScript for stage 2 task and olomoro.philippa@gmail.com
+Output Str: Hello World, this is Abdullateef Shonibare with HNGi7 ID HNG-01028 using javaScript for stage 2 task and email is solicks8355@gmail.com
+Output Str: Hello World, this is Habeeb Yusuf with HNGi7 ID HNG-05243 using Python for stage 2 task and yhabeeb95@gmail.com
+Output Str: Hello World, this is Daniel Effiong with HNGi7 ID HNG-04163 using javascript for stage 2 task and danroyaleffiong@gmail.com
+Output Str: Hello World, this is Saviour Mkpong with HNGi7 ID HNG-04531 using PHP for stage 2 task and email mkpongsaviour7@gmail.com
+Output Str: Hello World, this is Ovobite Solomon with HNGi7 ID HNG-04001 using javascript for stage 2 task and ovobite.solomon@gmail.com
+Output Str: Hello World, this is Sunny Pepple with HNGi7 ID HNG-05614 using Python for stage 2 task and slpepple01@gmail.com
+Output Str: Hello World, this is Mudalue Emeka with HNGi7 ID HNG-01029 using javascript for stage 2 task
+Output Str: Hello World, this is Othman GUERHLI with HNGi7 ID HNG-01952 using Python for stage 2 task and g.othman.anis@gmail.com
+Output Str: Hello World, this is Victor Desire with HNGi7 ID HNG-01598 using PHP for stage 2 task and this is my email address edesire22@yahoo.com
+Output Str: Hello World, this is Godspower Peter with HNGi7 ID HNG-03273 using PHP for stage 2 task and powerex4greatness@gmail.com
+Output Str: Hello World, this is David Kemdirim with HNGi7 ID HNG-00819 using Python for stage 2 task and david.kemdirim@yahoo.com
+Output Str: Hello World, this is Muhammad Abdullahi with HNGi7 ID HNG-00178 using JavaScript for stage 2 task and codedprogrammer00@gmail.com
+Output Str: Hello World, this is Agharaye Tseyi with HNGi7 ID HNG-06261 using javascript for stage 2 task and agharayetseyi@gmail.com
+Output Str: Hello World, this is Adesanoye Samson with HNGi7 ID HNG-04139 using Python for stage 2 task and adesanoye.samson1@gmail.com
+Output Str: Hello World, this is Samuel Lawal with HNGi7 ID HNG-03105 using Javascript for stage 2 task and samuellawal1979@gmail.com
+Output Str: Hello World, this is Enuma Ogbuefi with HNGi7 ID HNG-05187 using JavaScript for stage 2 task and enogbuefi@gmail.com
+Output Str: Hello World, this is Akindele Taiwo with HNGi7 ID HNG-03847 using Javascript for stage 2 task and taiwodavecode@gmail.com.
+Output Str: Hello World, this is NDJANFA Roy with HNGi7 ID HNG-05546 using JavaScript for stage 2 task and christoroybiaga@gmail.com
+Error Type: &lt;class &#x27;KeyError&#x27;&gt;, msg: &#x27;&#x27;
+json_data items: [
+    {
+        &quot;file&quot;: &quot;deecodez.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Obaro Oludayo with HNGi7 ID HNG-03457 using javaScript for stage 2 task and obarodayo@gmail.com&quot;,
+        &quot;email&quot;: &quot;obarodayo@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Obaro Oludayo&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03457&quot;,
+        &quot;language&quot;: &quot;javaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;OBITIHNGi7.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Akinwande Obiti with HNGi7 ID HNG-01255 using Javascript for stage 2 task and obitiakinwandeno1@gmail.com&quot;,
+        &quot;email&quot;: &quot;obitiakinwandeno1@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Akinwande Obiti&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01255&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Akin.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Akinloluwa Adeleye with HNGi7 ID HNG-00898 using javaScript for stage 2 task and akinloluwaa@yahoo.com&quot;,
+        &quot;email&quot;: &quot;akinloluwaa@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Akinloluwa Adeleye&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00898&quot;,
+        &quot;language&quot;: &quot;javaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;dromoh.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Gabriel Ifgoa with HNGi7 ID 02808 using PHP for stage 2 task and gabrielifoga@yahoo.com&quot;,
+        &quot;email&quot;: &quot;gabrielifoga@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Gabriel Ifgoa&quot;,
+        &quot;HNGId&quot;: &quot;&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;etima.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Etima Essien with HNGi7 ID HNG-05954 using Javascript for stage 2 task and essienetima1@gmail.com&quot;,
+        &quot;email&quot;: &quot;essienetima1@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Etima Essien&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05954&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;tame.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Toya Amechi with HNGi7 ID HNG-05516 using Javascript for stage 2 task and toya.amechi@gmail.com&quot;,
+        &quot;email&quot;: &quot;toya.amechi@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Toya Amechi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05516&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;peacefaleke.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Peace Faleke with HNGi7 ID HNG-01464 using PHP for stage 2 task and peaceaanu247@gmail.com&quot;,
+        &quot;email&quot;: &quot;peaceaanu247@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Peace Faleke&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01464&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;JAMIU_Abdulhafeez-HNG-02008.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is JAMIU Abdulhafeez with HNGi7 ID HNG-02008 using python for stage 2 task and jamiuwale20@gmail.com&quot;,
+        &quot;email&quot;: &quot;jamiuwale20@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;JAMIU Abdulhafeez&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02008&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;ikhaz task 2.py&quot;,
+        &quot;output&quot;: &quot;Hello World this is Eboreime Ikhazuangbe with HNGi7 ID HNG-00988 using python for stage 2 task and ikdboy_2011@yahoo.com&quot;,
+        &quot;email&quot;: &quot;ikdboy_2011@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;&quot;,
+        &quot;HNGId&quot;: &quot;&quot;,
+        &quot;language&quot;: &quot;&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;simeon979.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Adegbola Simeon with HNGi7 ID HNG-02271 using JavaScript for stage 2 task and adegbolasimeon@gmail.com&quot;,
+        &quot;email&quot;: &quot;adegbolasimeon@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Adegbola Simeon&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02271&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;princewilljackson-05290.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Princewill Jackson with HNGi7 ID HNG-05290 using Python for stage 2 task and princewilljackson@ymail.com&quot;,
+        &quot;email&quot;: &quot;princewilljackson@ymail.com&quot;,
+        &quot;fullname&quot;: &quot;Princewill Jackson&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05290&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;basilO.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Obasi Basil with HNGi7 ID HNG-02505 using JavaScript for stage 2 task and obasibas260@gmail.com&quot;,
+        &quot;email&quot;: &quot;obasibas260@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Obasi Basil&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02505&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Yusufsodiq.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Yusuf Sodiq with HNGi7 ID HNG-02857 using python for stage 2 task and yusufsodiq22@gmail.com&quot;,
+        &quot;email&quot;: &quot;yusufsodiq22@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Yusuf Sodiq&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02857&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;HNG-02691.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Victor Mba with HNGi7 ID HNG-02691 using python for stage 2 task and kalumba366@gmail.com&quot;,
+        &quot;email&quot;: &quot;kalumba366@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Victor Mba&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02691&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;akeem.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Akeem Agbaje with HNGi7 ID HNG-03992 using Javascript for stage 2 task and agbajeolawale@outlook.com&quot;,
+        &quot;email&quot;: &quot;agbajeolawale@outlook.com&quot;,
+        &quot;fullname&quot;: &quot;Akeem Agbaje&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03992&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;enumah-nneka-karen.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Nneka Karen with HNGi7 ID HNG-220202029920 using Javascript for stage 2 task and karenenumah@gmail.com&quot;,
+        &quot;email&quot;: &quot;karenenumah@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Nneka Karen&quot;,
+        &quot;HNGId&quot;: &quot;HNG-22020&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;mohawwal.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Bankole Awwal with HNGi7 ID HNG-00537 using Javascript for stage 2 task and awwalbankole@gmail.com.&quot;,
+        &quot;email&quot;: &quot;awwalbankole@gmail.com.&quot;,
+        &quot;fullname&quot;: &quot;Bankole Awwal&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00537&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;hefeholuwah.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ifeoluwa Adefioye with HNGi7 ID HNG-01833 using python for stage 2 task and ilieas300@gmail.com&quot;,
+        &quot;email&quot;: &quot;ilieas300@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ifeoluwa Adefioye&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01833&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;praise.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Praise Odeyemi with HNGi7 ID HNG-05451 using Python for stage 2 task and boluwatifeodeyemi@gmail.com&quot;,
+        &quot;email&quot;: &quot;boluwatifeodeyemi@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Praise Odeyemi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05451&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;task.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Lateefat Onaolapo with HNGi7 ID HNG-04514 using JavaScript for stage 2 task and onaolapolateefah@gmail.com&quot;,
+        &quot;email&quot;: &quot;onaolapolateefah@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Lateefat Onaolapo&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04514&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Adejinadu.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ade Jinadu with HNGi7 ID HNG-00217 using PHP for stage 2 task and ade@techplus.com.ng&quot;,
+        &quot;email&quot;: &quot;ade@techplus.com.ng&quot;,
+        &quot;fullname&quot;: &quot;Ade Jinadu&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00217&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Mrprime01.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Kabir Abdulsalam with HNGi7 ID HNG-05020 using Javascript for stage 2 task and abdulsalamkabir99@gmail.com&quot;,
+        &quot;email&quot;: &quot;abdulsalamkabir99@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Kabir Abdulsalam&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05020&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;somto-hng7.0-task2.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Okafor Somtochukwu Emmanuel with HNGi7 ID HNG-01771 using php for stage 2 task and sommy.okafor@yahoo.com&quot;,
+        &quot;email&quot;: &quot;sommy.okafor@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Okafor Somtochukwu Emmanuel&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01771&quot;,
+        &quot;language&quot;: &quot;php&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;jayne-HNGi7-03386.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Jane Essien with HNGi7 ID HNG-03386 using JavaScript for stage 2 task and jayneessien@gmail.com.&quot;,
+        &quot;email&quot;: &quot;jayneessien@gmail.com.&quot;,
+        &quot;fullname&quot;: &quot;Jane Essien&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03386&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Joemires-HNG-02360.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Joseph Bassey with HNGi7 ID HNG-02360 using PHP for stage 2 task and Joemires20@yahoo.com&quot;,
+        &quot;email&quot;: &quot;Joemires20@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Joseph Bassey&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02360&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;kenway.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Kenway King with HNGi7 ID HNG-00299 using PHP for stage 2 task and kingkenway16@gmail.com&quot;,
+        &quot;email&quot;: &quot;kingkenway16@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Kenway King&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00299&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;faith.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Udoh Faith with HNGi7 ID HNG-05995 using Javascript for stage 2 task and faithudoh71@gmail.com&quot;,
+        &quot;email&quot;: &quot;faithudoh71@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Udoh Faith&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05995&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;GabriellaAmah.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Gabriella Amaefule with HNGi7 ID HNG-02535 using javascript for stage 2 task and  gabbieamah49@gmail.com&quot;,
+        &quot;email&quot;: &quot;gabbieamah49@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Gabriella Amaefule&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02535&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;waynee46.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Omobola Wayne Lawal with HNGi7 ID HNG-06166 using Javascript for stage 2 task and omobolalawal6@gmail.com&quot;,
+        &quot;email&quot;: &quot;omobolalawal6@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Omobola Wayne Lawal&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06166&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;iAmServer-HNG-00535.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Oladayo Egbeyemi with HNGi7 ID HNG-00535 using JavaScript for stage 2 task and dasther@outlook.com&quot;,
+        &quot;email&quot;: &quot;dasther@outlook.com&quot;,
+        &quot;fullname&quot;: &quot;Oladayo Egbeyemi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00535&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;nexta.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Emmanuel Omeogah with HNGi7 ID HNG-02861 using Python for stage 2 task and email chinedue16@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Emmanuel Omeogah&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02861&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;anas-falau.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Anas Ibrahim with HNGi7 ID HNG-04220 using python for stage 2 task and anas.falau@gmail.com&quot;,
+        &quot;email&quot;: &quot;anas.falau@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Anas Ibrahim&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04220&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;emmanuel.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Oni Emmanuel Temitope with HNGi7 ID HNG-03120 using Javascript for stage 2 task and oniemmanuel90@gmail.com&quot;,
+        &quot;email&quot;: &quot;oniemmanuel90@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Oni Emmanuel Temitope&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03120&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;enodavid-HNG-01040.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Enobong Umoette with HNGi7 ID HNG-01040 using python for stage 2 task and eno.umoette@gmail.com&quot;,
+        &quot;email&quot;: &quot;eno.umoette@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Enobong Umoette&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01040&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;nelson.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Nelson Chinedu with HNGi7 ID HNG-04904 using javaScript for stage 2 task and egwuchinedu69@gmail.com&quot;,
+        &quot;email&quot;: &quot;egwuchinedu69@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Nelson Chinedu&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04904&quot;,
+        &quot;language&quot;: &quot;javaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Imwithjosh.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Oyewale Tayo with HNGi7 ID HNG-03316 using JavaScript for stage 2 task and tayooyewale@gmail.com&quot;,
+        &quot;email&quot;: &quot;tayooyewale@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Oyewale Tayo&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03316&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Seni.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Oladokun Seni with HNGi7 ID HNG-04250 using Javascript for stage 2 task  and senioladokun44@gmail.com&quot;,
+        &quot;email&quot;: &quot;senioladokun44@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Oladokun Seni&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04250&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;michael.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Micahel Olusoji with HNGi7 ID HNG-04964 using python for stage 2 task and olusoji200@gmail.com&quot;,
+        &quot;email&quot;: &quot;olusoji200@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Micahel Olusoji&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04964&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;abdulmatin.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Abdulmatin Adeniji with HNGi7 ID HNG-04536 using JavaScript for stage 2 task and abdulmatinadeniji@gmail.com&quot;,
+        &quot;email&quot;: &quot;abdulmatinadeniji@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Abdulmatin Adeniji&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04536&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;fresher.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Usman Soliu with HNGi7 ID HNG-06665 using PHP for stage 2 task and fresher.dev01@gmail.com&quot;,
+        &quot;email&quot;: &quot;fresher.dev01@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Usman Soliu&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06665&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;nonseodion.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ifebhor Nonse with HNGi7 ID HNG-04707 using Javascript for stage 2 task and nonseifebhor@gmail.com&quot;,
+        &quot;email&quot;: &quot;nonseifebhor@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ifebhor Nonse&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04707&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;frances.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Frances Oparaocha with HNGi7 ID HNG-00114 using Javascript for stage 2 task and francesoparaocha@gmail.com&quot;,
+        &quot;email&quot;: &quot;francesoparaocha@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Frances Oparaocha&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00114&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;ugbotor.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ugbotor Emmanuel with HNGi7 ID HNG-03845 using javascript for stage 2 task and emmanuelugbotor@gmail.com&quot;,
+        &quot;email&quot;: &quot;emmanuelugbotor@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ugbotor Emmanuel&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03845&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;amoodaniel_.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Amoo Daniel with HNGi7 ID HNG-02816 using Python for stage 2 task and danielamoo35@gmail.com&quot;,
+        &quot;email&quot;: &quot;danielamoo35@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Amoo Daniel&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02816&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;chatt.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Mohamed Ali with HNGi7 ID HNG-05487 using Python for stage 2 task and alaricdemahom11@gmail.com&quot;,
+        &quot;email&quot;: &quot;alaricdemahom11@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Mohamed Ali&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05487&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;O&#x27;Herbert.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Herbert Olinga  with HNGi7 ID HNG-03838 using Javascript for stage 2 task and email tikewilly@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Herbert Olinga &quot;,
+        &quot;HNGId&quot;: &quot;HNG-03838&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;nte.js&quot;,
+        &quot;output&quot;: &quot;&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;&quot;,
+        &quot;HNGId&quot;: &quot;&quot;,
+        &quot;language&quot;: &quot;&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Hello2.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Okolie Samuelwith HNGi7 ID HNG-06795using Javascriptfor stage 2 task and uche7877@gmail.com&quot;,
+        &quot;email&quot;: &quot;uche7877@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06795&quot;,
+        &quot;language&quot;: &quot;Javascriptfor&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;steveos.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Stephen Oyebanji with HNGi7 ID HNG-00014 using javascript for stage 2 task and seyioyebanjistephen@gmail.com&quot;,
+        &quot;email&quot;: &quot;seyioyebanjistephen@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Stephen Oyebanji&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00014&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;sanusi.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Sanusi Razaq with HNGi7 ID HNG-02064 using JavaScript for stage 2 task and softinputcode@gmail.com&quot;,
+        &quot;email&quot;: &quot;softinputcode@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Sanusi Razaq&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02064&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;onogu.js&quot;,
+        &quot;output&quot;: &quot;&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;&quot;,
+        &quot;HNGId&quot;: &quot;&quot;,
+        &quot;language&quot;: &quot;&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;chidubem-Onyeukwu.js&quot;,
+        &quot;output&quot;: &quot; Hello World, this is Chidubem Onyeukwu with HNGi7 ID HNG-03733 using Javascript for stage 2 task and onyeukwuchidubemclinton@gmail.com&quot;,
+        &quot;email&quot;: &quot;onyeukwuchidubemclinton@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;&quot;,
+        &quot;HNGId&quot;: &quot;&quot;,
+        &quot;language&quot;: &quot;&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;balogun_script.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Balogun Lukman with HNGi7 ID HNG-01022 using Javascript for stage 2 task and lukheebalo@gmail.com&quot;,
+        &quot;email&quot;: &quot;lukheebalo@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Balogun Lukman&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01022&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;BETHEL-HNGid-05125.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Osahon Bethel with HNGi7 ID HNG-05125 and email bethelosahon@gmail.com using Javascript for stage 2 task and bethelosahon@gmail.com&quot;,
+        &quot;email&quot;: &quot;bethelosahon@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Osahon Bethel&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05125&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;okiki.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Malomo Okikioluwa with HNGi7 ID HNG-01674 using javascript for stage 2 task&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Malomo Okikioluwa&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01674&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;djoker.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Chidi Arua with HNGi7 ID HNG-05000 using Python for stage 2 task and chidiarua99@gmail.com&quot;,
+        &quot;email&quot;: &quot;chidiarua99@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Chidi Arua&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05000&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Adeolaa.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Adeleye Abdulbasit with HNGi7 ID HNG-00429 using Javascript for stage 2 task and adeleyeabdulbasit@gmail.com&quot;,
+        &quot;email&quot;: &quot;adeleyeabdulbasit@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Adeleye Abdulbasit&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00429&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;BodeRahman-HNG-01553.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Abdulrahman Olagunju with HNGi7 ID HNG-01553 using JavaScript for stage 2 task and abdulrahmanolagunju.1@gmail.com&quot;,
+        &quot;email&quot;: &quot;abdulrahmanolagunju.1@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Abdulrahman Olagunju&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01553&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;muhdibee.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Muhammad Ibrahim with HNGi7 ID HNG-05713 using javascript for stage 2 task and muhdibee@gmail.com&quot;,
+        &quot;email&quot;: &quot;muhdibee@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Muhammad Ibrahim&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05713&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Francis-Adegbe.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Francis Adegbe with HNGi7 ID HNG-00130 using JavaScript for stage 2 task and Francismission61@gmail.com&quot;,
+        &quot;email&quot;: &quot;Francismission61@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Francis Adegbe&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00130&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;pidoxy.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Emmanuel Idoko with HNGi7 ID HNG-00247 using JavaScript for stage 2 task and pidox31102002@gmail.com&quot;,
+        &quot;email&quot;: &quot;pidox31102002@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Emmanuel Idoko&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00247&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;david.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Davidson Ayo with HNGi7 ID HNG-06359 using javascript for stage 2 task and davidbrain162@gmail.com&quot;,
+        &quot;email&quot;: &quot;davidbrain162@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Davidson Ayo&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06359&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;oluwatobiloba.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Oluwatobiloba Okekunle with HNGi7 ID HNG-01385 using javascript for stage 2 task and okekunletobi@gmail.com&quot;,
+        &quot;email&quot;: &quot;okekunletobi@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Oluwatobiloba Okekunle&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01385&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;cre8ive_collins.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Collins Wilson with HNGi7 ID HNG-04747 using Python for stage 2 task and wilsoncollins44@yahoo.com&quot;,
+        &quot;email&quot;: &quot;wilsoncollins44@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Collins Wilson&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04747&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;edgar.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Doken Edgar with HNGi7 ID HNG-03938 using Javascript for stage 2 task and dokenedgarjr@gmail.com&quot;,
+        &quot;email&quot;: &quot;dokenedgarjr@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Doken Edgar&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03938&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;David_Alenoghena.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is David Alenoghena with HNGi7 ID HNG-05232 using Javascript for stage 2 task and davidalenoghena@gmail.com&quot;,
+        &quot;email&quot;: &quot;davidalenoghena@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;David Alenoghena&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05232&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;ibnlanre-HNG-04024.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ridwan Olanrewaju with HNGi7 ID HNG-04024 using JavaScript for stage 2 task and olaitanlanre28@gmail.com&quot;,
+        &quot;email&quot;: &quot;olaitanlanre28@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ridwan Olanrewaju&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04024&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Ahkimoosa.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Abdullahi Musa with HNGi7 ID HNG-01532 using Javascript for stage 2 task and moosaabdullahi45@gmail.com&quot;,
+        &quot;email&quot;: &quot;moosaabdullahi45@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Abdullahi Musa&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01532&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Task_1.js&quot;,
+        &quot;output&quot;: &quot;&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;&quot;,
+        &quot;HNGId&quot;: &quot;&quot;,
+        &quot;language&quot;: &quot;&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;phoebe.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Obaje Phoebe with HNGi7 ID HNG-03935 using Javascript for stage 2 task and obajephoebe@gmail.com&quot;,
+        &quot;email&quot;: &quot;obajephoebe@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Obaje Phoebe&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03935&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;olanetsoft.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Idris Olubisi with HNGi7 ID HNG-01329 using javascript for stage 2 task and heedris2olubisi@gmail.com&quot;,
+        &quot;email&quot;: &quot;heedris2olubisi@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Idris Olubisi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01329&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;agharayee.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Agharaye Emmanuel with HNGi7 ID HNG-03441 using javascript for stage 2 task and agharayee@gmail.com&quot;,
+        &quot;email&quot;: &quot;agharayee@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Agharaye Emmanuel&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03441&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;02883-jic.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Justice Obioha with HNGi7 ID HNG-02883 using JavaScript for stage 2 task and obiohajustiamimbus@gmail.com&quot;,
+        &quot;email&quot;: &quot;obiohajustiamimbus@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Justice Obioha&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02883&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;miceuud.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Mike Udoh with HNGi7 ID HNG-03524 using Javascript for stage 2 task and miceuud@gmail.com&quot;,
+        &quot;email&quot;: &quot;miceuud@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Mike Udoh&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03524&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;szirra_HNG-05110.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Shaphan Zirra with HNGi7 ID HNG-05110 using JavaScript for stage 2 task and francisshaphan@gmail.comHello World, this is Shaphan Zirra with HNGi7 ID HNG-05110 using JavaScript for stage 2 task and francisshaphan@gmail.com&quot;,
+        &quot;email&quot;: &quot;francisshaphan@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Shaphan Zirra&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05110&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;spleendoon.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Onwuka Kelvin with HNGi7 ID HNG-06274 using javascript for stage 2 task and my email is hax0r3dg3@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Onwuka Kelvin&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06274&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;kennyendowed-05471.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is kenneth Akpan with HNGi7 ID HNG-05471 using PHP for stage 2 task and kenneyg50@gmail.com&quot;,
+        &quot;email&quot;: &quot;kenneyg50@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;kenneth Akpan&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05471&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;06228.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Tumininu Ijabadeniyi with HNGi7 ID HNG-06228 using python for stage 2 task and tumininuadeniyi@gmail.com&quot;,
+        &quot;email&quot;: &quot;tumininuadeniyi@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Tumininu Ijabadeniyi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06228&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Nathan-HNG-05788.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Okolo Nathan with HNGi7 ID HNG-05788 using Python for stage 2 task and okolonathanchinedu@gmail.com&quot;,
+        &quot;email&quot;: &quot;okolonathanchinedu@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Okolo Nathan&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05788&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;amarabest.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ukeje Amarachi with HNGi7 ID HNG-02625 using JavaScript for stage 2 task and ukejeamarajovita@gmail.com&quot;,
+        &quot;email&quot;: &quot;ukejeamarajovita@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ukeje Amarachi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02625&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;jesmanto-00061.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Jesse Okoro with HNGi7 ID HNG-00061 using javascript for stage 2 task and okorojesse@gmail.comokorojesse@gmail.com&quot;,
+        &quot;email&quot;: &quot;okorojesse@gmail.comokorojesse&quot;,
+        &quot;fullname&quot;: &quot;Jesse Okoro&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00061&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;MarvellousUbani.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Marvellous Michaels with HNGi7 ID HNG-06741 using Javascript for stage 2 task and marvellousmikez@gmail.com&quot;,
+        &quot;email&quot;: &quot;marvellousmikez@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Marvellous Michaels&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06741&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;ovuchukwu1.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ovu Samuel with HNGi7 ID HNG-03196 using JavaScript for stage 2 task and ovusamuel@gmail.com&quot;,
+        &quot;email&quot;: &quot;ovusamuel@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ovu Samuel&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03196&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;ozzie.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ugwuoke Ozioma with HNGi7 ID HNG-00610 using JavaScript for stage 2 task and oziomaonyishi4@gmail.com&quot;,
+        &quot;email&quot;: &quot;oziomaonyishi4@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ugwuoke Ozioma&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00610&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;mikail.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Mikail Yusuf with HNGi7 ID HNG-02327 using PHP for stage 2 task and mikaeelkyusuf@gmail.com&quot;,
+        &quot;email&quot;: &quot;mikaeelkyusuf@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Mikail Yusuf&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02327&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;tunechi.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Mudalue Emeka with HNGi7 ID HNG-01029 using javascript for stage 2 task and emekachristian511@gmail.com&quot;,
+        &quot;email&quot;: &quot;emekachristian511@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Mudalue Emeka&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01029&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;NwokochaHannah-HNG-01883.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Nwokocha Hannah with HNGi7 ID HNG-01883 using Javascript for stage 2 task and my email is nwokochahannah@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Nwokocha Hannah&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01883&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;layoolar.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ayoola Olayiwola with HNGi7 ID HNG-06411 using PHP for stage 2 task and ayoola2906@gmail.com&quot;,
+        &quot;email&quot;: &quot;ayoola2906@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ayoola Olayiwola&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06411&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Ledy.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ledisi Zabbey with HNGi7 ID HNG-01980 using Javascript for stage 2 task and ledisizab@gmail.com&quot;,
+        &quot;email&quot;: &quot;ledisizab@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ledisi Zabbey&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01980&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;samuelorobosa.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Samuel Amagbakhen with HNGi7 ID HNG-00558 using JavaScript for stage 2 task and amagbakhensamuel@gmail.com&quot;,
+        &quot;email&quot;: &quot;amagbakhensamuel@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Samuel Amagbakhen&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00558&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Emmanuelaknd.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Akande Emmanuel with HNGi7 ID HNG-05918 using JavaScript for stage 2 task and akandeemmanuel1993@gmail.com&quot;,
+        &quot;email&quot;: &quot;akandeemmanuel1993@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Akande Emmanuel&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05918&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;michaelef.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Michael Eferemo with HNGi7 ID HNG -05538 using python for stage 2 task and my email is meferemo@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Michael Eferemo&quot;,
+        &quot;HNGId&quot;: &quot;&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;app.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Eboreime Ikhazuangbe with HNGi7 ID HNG-00988 using python for stage 2 task and ikdboy_2011@yahoo.com&quot;,
+        &quot;email&quot;: &quot;ikdboy_2011@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Eboreime Ikhazuangbe&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00988&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;chidumga.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Onwuka Chidumga with HNGi7 ID HNG-06529 using javascript for stage 2 task and my email is kelvinonwuka8@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Onwuka Chidumga&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06529&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;mudigram.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Mudiaga Omene with HNGi7 ID HNG-05952 using Python for stage 2 task and omene.mudiaga@gmail.com&quot;,
+        &quot;email&quot;: &quot;omene.mudiaga@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Mudiaga Omene&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05952&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;eel.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Lilian Ovrawah with HNGi7 ID HNG-03716 using PHP for stage 2 task and this is my email address lilianovrawah@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Lilian Ovrawah&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03716&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;yhkehinde.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Yahaya Kehinde with HNGi7 ID HNG-01939 using javascript for stage 2 task  and y.hkehinde@yahoo.com&quot;,
+        &quot;email&quot;: &quot;y.hkehinde@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Yahaya Kehinde&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01939&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Vikilinho.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Victor Ayodeji Ogundola with HNGi7 ID HNG-03102 using Python for stage 2 task and dvicxy@gmail.com&quot;,
+        &quot;email&quot;: &quot;dvicxy@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Victor Ayodeji Ogundola&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03102&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Akpjunior.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Akpan Abraham with HNGi7 ID HNG-01927 using JavaScript for stage 2 task and akpjunio4real@gmail.com.&quot;,
+        &quot;email&quot;: &quot;akpjunio4real@gmail.com.&quot;,
+        &quot;fullname&quot;: &quot;Akpan Abraham&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01927&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;flair.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Okonkwo Miracle with HNGi7 ID HNG-05715 using javascript for stage 2 task and dev.okonkwoflair@gmail.com&quot;,
+        &quot;email&quot;: &quot;dev.okonkwoflair@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Okonkwo Miracle&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05715&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;goodhands.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Samuel Olaegbe with HNGi7 ID HNG-05170 using PHP for stage 2 task and olaegbesamuel@gmail.com&quot;,
+        &quot;email&quot;: &quot;olaegbesamuel@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Samuel Olaegbe&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05170&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;smartbrain-HNG-05813.py&quot;,
+        &quot;output&quot;: &quot;Hello World, This is Asaaju Olalekan with HNGi7 ID HNG-05813 and email asaajulekan@gmail.com using python for stage 2 task&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05813&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Izu.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Izuchukwu Iwuchuckwu with HNGi7 ID HNG-01559 using Javascript for stage 2 task and izuchuksiwuh@yahoo.com&quot;,
+        &quot;email&quot;: &quot;izuchuksiwuh@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Izuchukwu Iwuchuckwu&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01559&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Srcipt_IP.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ipoola Peter with HNGi7 ID HNG-02619 using Javascript for stage 2 task and peteripoola@yahoo.com&quot;,
+        &quot;email&quot;: &quot;peteripoola@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;Ipoola Peter&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02619&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Damflex.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Oke Oluwatobi with HNGi7 ID HNG-02356 using javascript for stage 2 task and akanji4destiny@gmail.com&quot;,
+        &quot;email&quot;: &quot;akanji4destiny@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Oke Oluwatobi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02356&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;alienMotherX.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Atiku Uthman with HNGi7 ID HNG-05273 using python for stage 2 task and dmejii@outlook.com&quot;,
+        &quot;email&quot;: &quot;dmejii@outlook.com&quot;,
+        &quot;fullname&quot;: &quot;Atiku Uthman&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05273&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;janilawy.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Tijani Muhammed lawal with HNGi7 ID HNG-03379 using javaScript for stage 2 task and janilawy@gmail.com&quot;,
+        &quot;email&quot;: &quot;janilawy@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Tijani Muhammed lawal&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03379&quot;,
+        &quot;language&quot;: &quot;javaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;writeshittu.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Shittu Akeem with HNGi7 ID HNG-00268 using JavaScript for stage 2 task and writeshittu@gmail.com&quot;,
+        &quot;email&quot;: &quot;writeshittu@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Shittu Akeem&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00268&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;peter.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Peter Erinfolami with HNGi7 ID HNG-02073 using Python for stage 2 task and petersp2000@gmail.com&quot;,
+        &quot;email&quot;: &quot;petersp2000@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Peter Erinfolami&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02073&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;eonyedikachi.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Onyedikachi Ibeabuchi with HNGi7 ID HNG-04135 using JavaScript for stage 2 task and ibeabuchionyedikachii@gmail.com&quot;,
+        &quot;email&quot;: &quot;ibeabuchionyedikachii@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Onyedikachi Ibeabuchi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04135&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;MelvisMoba.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Moba Melvis Ringnyu with HNGi7 ID HNG-02763 using javascript for stage 2 task and ringnyum@gmail.com&quot;,
+        &quot;email&quot;: &quot;ringnyum@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Moba Melvis Ringnyu&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02763&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Olumuyiwa.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Olumuyiwa Akanni with HNGi7 ID HNG-03417 using JavaScript for stage 2 task and akannimuyiwa@gmail.com&quot;,
+        &quot;email&quot;: &quot;akannimuyiwa@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Olumuyiwa Akanni&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03417&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;abdulrasheed.lawal-HNG-03240.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Abdulrasheed Lawal with HNGi7 ID HNG-03240 using python for stage 2 task and lawalabdulrasheedbolaji@gmail.com&quot;,
+        &quot;email&quot;: &quot;lawalabdulrasheedbolaji@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Abdulrasheed Lawal&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03240&quot;,
+        &quot;language&quot;: &quot;python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Omaye1.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Abdullahi Abdul with HNGi7 ID HNG-00909 using PHP for stage 2 task and sendabdulmail@gmail.com&quot;,
+        &quot;email&quot;: &quot;sendabdulmail@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Abdullahi Abdul&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00909&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Asifiwe.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Manzi Asifiwe with HNGi7 ID HNG-05507 using JavaScript for stage 2 task and asifiwemanzi@gmail.com&quot;,
+        &quot;email&quot;: &quot;asifiwemanzi@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Manzi Asifiwe&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05507&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;mood-HNG-01489.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ahmed Mansour with HNGi7 ID HNG-01489 using javascript for stage 2 task and email moodfactor@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Ahmed Mansour&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01489&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;LOYE.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Abisoye Akinloye with HNGi7 ID HNG-02078 using Javascript for stage 2 task and my email is abisoyeakinloye@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Abisoye Akinloye&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02078&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;mayokun_adeniyi.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Mayokun Adeniyi with HNGi7 ID HNG-01525 using Python for stage 2 task and adeniyimayokun17@gmail.com&quot;,
+        &quot;email&quot;: &quot;adeniyimayokun17@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Mayokun Adeniyi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01525&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Afrikanist.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Toju Izuabgala with HNGi7 ID HNG-02401 using JavaScript for stage 2 task and intrepidjayson@gmail.com&quot;,
+        &quot;email&quot;: &quot;intrepidjayson@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Toju Izuabgala&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02401&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Monahme2-HNG-01973.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Remonah Makwata with HNGi7 ID HNG-01973 using JavaScript for stage 2 task and email mainaremmy294@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Remonah Makwata&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01973&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;kabuyedouglashozea.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Douglas Hozea with HNGi7 ID HNG-03324 using Python for stage 2 task and kabuyedouglas53@gmail.com&quot;,
+        &quot;email&quot;: &quot;kabuyedouglas53@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Douglas Hozea&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03324&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Timilehin-bello.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Bello Oluwatimilehin with HNGi7 ID HNG-02144 using JavaScript for stage 2 task and my email is emmmatimmybello@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Bello Oluwatimilehin&quot;,
+        &quot;HNGId&quot;: &quot;HNG-02144&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Lateo.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Obah Lateo Frederick with HNGi7 ID HNG-04973 using Python for stage 2 task and lateofrederick@gmail.com&quot;,
+        &quot;email&quot;: &quot;lateofrederick@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Obah Lateo Frederick&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04973&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Ndifreke.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ndifreke Asuquo with HNGi7 ID HNG-05639 using Python for stage 2 task and asuquondifreke06@gmail.com&quot;,
+        &quot;email&quot;: &quot;asuquondifreke06@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ndifreke Asuquo&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05639&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;miracle-HNG-03127.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Miracle Ozukalu with HNGi7 ID HNG-03127 using javascript for stage 2 task and miraclekalu1212@gmail.com&quot;,
+        &quot;email&quot;: &quot;miraclekalu1212@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Miracle Ozukalu&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03127&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;index.php&quot;,
+        &quot;output&quot;: &quot;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;Hello world! &lt;br&gt;This is Ade Jinadu, with with HNGi7 ID 00217 using PHP for stage 2 task and ade@techplus.com.ng &lt;/body&gt;&lt;/html&gt;&quot;,
+        &quot;email&quot;: &quot;ade@techplus.com.ng&quot;,
+        &quot;fullname&quot;: &quot;&quot;,
+        &quot;HNGId&quot;: &quot;&quot;,
+        &quot;language&quot;: &quot;&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;PhilippaOlomoro-HNG-04602.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Philippa Olomoro with HNGi7 ID HNG-04602 using JavaScript for stage 2 task and olomoro.philippa@gmail.com&quot;,
+        &quot;email&quot;: &quot;olomoro.philippa@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Philippa Olomoro&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04602&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;solicks.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Abdullateef Shonibare with HNGi7 ID HNG-01028 using javaScript for stage 2 task and email is solicks8355@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Abdullateef Shonibare&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01028&quot;,
+        &quot;language&quot;: &quot;javaScript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;HabeebAY.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Habeeb Yusuf with HNGi7 ID HNG-05243 using Python for stage 2 task and yhabeeb95@gmail.com&quot;,
+        &quot;email&quot;: &quot;yhabeeb95@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Habeeb Yusuf&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05243&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;daniel.effiong.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Daniel Effiong with HNGi7 ID HNG-04163 using javascript for stage 2 task and danroyaleffiong@gmail.com&quot;,
+        &quot;email&quot;: &quot;danroyaleffiong@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Daniel Effiong&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04163&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;save.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Saviour Mkpong with HNGi7 ID HNG-04531 using PHP for stage 2 task and email mkpongsaviour7@gmail.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Saviour Mkpong&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04531&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;WealthcodeX.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Ovobite Solomon with HNGi7 ID HNG-04001 using javascript for stage 2 task and ovobite.solomon@gmail.com&quot;,
+        &quot;email&quot;: &quot;ovobite.solomon@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Ovobite Solomon&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04001&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;pepps01-05614.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Sunny Pepple with HNGi7 ID HNG-05614 using Python for stage 2 task and slpepple01@gmail.com&quot;,
+        &quot;email&quot;: &quot;slpepple01@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Sunny Pepple&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05614&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;christian.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Mudalue Emeka with HNGi7 ID HNG-01029 using javascript for stage 2 task&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Mudalue Emeka&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01029&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;g0thman-HNG-01952.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Othman GUERHLI with HNGi7 ID HNG-01952 using Python for stage 2 task and g.othman.anis@gmail.com&quot;,
+        &quot;email&quot;: &quot;g.othman.anis@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Othman GUERHLI&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01952&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;vdeezie.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Victor Desire with HNGi7 ID HNG-01598 using PHP for stage 2 task and this is my email address edesire22@yahoo.com&quot;,
+        &quot;email&quot;: &quot;&quot;,
+        &quot;fullname&quot;: &quot;Victor Desire&quot;,
+        &quot;HNGId&quot;: &quot;HNG-01598&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Fail&quot;
+    },
+    {
+        &quot;file&quot;: &quot;gp.php&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Godspower Peter with HNGi7 ID HNG-03273 using PHP for stage 2 task and powerex4greatness@gmail.com&quot;,
+        &quot;email&quot;: &quot;powerex4greatness@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Godspower Peter&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03273&quot;,
+        &quot;language&quot;: &quot;PHP&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Joanes.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is David Kemdirim with HNGi7 ID HNG-00819 using Python for stage 2 task and david.kemdirim@yahoo.com&quot;,
+        &quot;email&quot;: &quot;david.kemdirim@yahoo.com&quot;,
+        &quot;fullname&quot;: &quot;David Kemdirim&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00819&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;mumeex.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Muhammad Abdullahi with HNGi7 ID HNG-00178 using JavaScript for stage 2 task and codedprogrammer00@gmail.com&quot;,
+        &quot;email&quot;: &quot;codedprogrammer00@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Muhammad Abdullahi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-00178&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;ashagzy.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Agharaye Tseyi with HNGi7 ID HNG-06261 using javascript for stage 2 task and agharayetseyi@gmail.com&quot;,
+        &quot;email&quot;: &quot;agharayetseyi@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Agharaye Tseyi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-06261&quot;,
+        &quot;language&quot;: &quot;javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;kingzamzon.py&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Adesanoye Samson with HNGi7 ID HNG-04139 using Python for stage 2 task and adesanoye.samson1@gmail.com&quot;,
+        &quot;email&quot;: &quot;adesanoye.samson1@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Adesanoye Samson&quot;,
+        &quot;HNGId&quot;: &quot;HNG-04139&quot;,
+        &quot;language&quot;: &quot;Python&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;quantum2001-HNG-03105.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Samuel Lawal with HNGi7 ID HNG-03105 using Javascript for stage 2 task and samuellawal1979@gmail.com&quot;,
+        &quot;email&quot;: &quot;samuellawal1979@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Samuel Lawal&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03105&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Enuma-HNG-05187.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Enuma Ogbuefi with HNGi7 ID HNG-05187 using JavaScript for stage 2 task and enogbuefi@gmail.com&quot;,
+        &quot;email&quot;: &quot;enogbuefi@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;Enuma Ogbuefi&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05187&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;Taiwodave_HNG_03847.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is Akindele Taiwo with HNGi7 ID HNG-03847 using Javascript for stage 2 task and taiwodavecode@gmail.com.&quot;,
+        &quot;email&quot;: &quot;taiwodavecode@gmail.com.&quot;,
+        &quot;fullname&quot;: &quot;Akindele Taiwo&quot;,
+        &quot;HNGId&quot;: &quot;HNG-03847&quot;,
+        &quot;language&quot;: &quot;Javascript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    },
+    {
+        &quot;file&quot;: &quot;roy.js&quot;,
+        &quot;output&quot;: &quot;Hello World, this is NDJANFA Roy with HNGi7 ID HNG-05546 using JavaScript for stage 2 task and christoroybiaga@gmail.com&quot;,
+        &quot;email&quot;: &quot;christoroybiaga@gmail.com&quot;,
+        &quot;fullname&quot;: &quot;NDJANFA Roy&quot;,
+        &quot;HNGId&quot;: &quot;HNG-05546&quot;,
+        &quot;language&quot;: &quot;JavaScript&quot;,
+        &quot;status&quot;: &quot;Pass&quot;
+    }
+]
+Files processed: 325
+Script Success: 297
+Script Fails: 28
+JavaScripts count: 94 Java count: 0 Php count: 17 Python count: 34
+<br/> ------------------------------Captured stderr call------------------------------ <br/>/home/george/PycharmProjects/learning-spree/app/scripts/Task_1.js:14
+document.body.innerHTML = show_task;
+^
+
+ReferenceError: document is not defined
+    at Object.&lt;anonymous&gt; (/home/george/PycharmProjects/learning-spree/app/scripts/Task_1.js:14:1)
+    at Module._compile (internal/modules/cjs/loader.js:778:30)
+    at Object.Module._extensions..js (internal/modules/cjs/loader.js:789:10)
+    at Module.load (internal/modules/cjs/loader.js:653:32)
+    at tryModuleLoad (internal/modules/cjs/loader.js:593:12)
+    at Function.Module._load (internal/modules/cjs/loader.js:585:3)
+    at Function.Module.runMain (internal/modules/cjs/loader.js:831:12)
+    at startup (internal/bootstrap/node.js:283:19)
+    at bootstrapNodeJSCore (internal/bootstrap/node.js:622:3)
+<br/></div></td></tr></tbody></table></body></html>

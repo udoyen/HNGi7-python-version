@@ -4,7 +4,7 @@ import re
 from collections import OrderedDict
 import json
 import itertools
-from flask import Flask, render_template, make_response, request, jsonify, Response
+from flask import Flask, render_template, make_response, request, jsonify, Response, stream_with_context
 
 # regex code
 r"""
@@ -132,6 +132,7 @@ def process_users() -> list:
 def stream_template(template_name, **context):
     """
     Helps to stream template response
+    See: https://flask.palletsprojects.com/en/1.1.x/patterns/streaming/
     :param template_name:
     :param context:
     :return:
@@ -152,7 +153,7 @@ def index():
     :return: either a json response or the index.html page
     """
     data = process_users().__iter__()
-    # app.app_context().push()
+
     if 'json' in request.args:
         def generate():
             """
