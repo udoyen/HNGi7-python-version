@@ -159,6 +159,7 @@ def index():
             This is a little tricky, as we need to omit the last comma to make valid JSON,
             thus we use a lagging generator, similar to http://stackoverflow.com/questions/1630320/
             See: https://blog.al4.co.nz/2016/01/streaming-json-with-flask/
+            See: https://flask.palletsprojects.com/en/1.1.x/patterns/streaming/
             :return: Flask Response object
             """
             try:
