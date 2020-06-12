@@ -7,22 +7,23 @@ import itertools
 from flask import Flask, render_template, make_response, request, jsonify, Response
 
 # regex code
-"""
-email: ^Hello\sWorld,.*and\s(.*@\w+\.\w+)\.{0,1}$
-names: ^Hello\s*World,\s.+is\s*([\w\s-]*)\swith.*
-hng id: ^Hello\s*World,\s.+ID\s(HNG-\d{5})
-language: ^Hello\s*World,\s.+using\s(\w+)
-email = re.match(r"^Hello\sWorld,.*and\s(.*@\w+\.\w+)\.{0,1}$", email)
-name = re.match(r"^Hello\s*World,\s.+is\s([\w\s]+)\swith", email)
-test = re.match(r"", sample)
+r"""
+email: r"^Hello\sWorld,.*and\s(.*@\w+\.\w+)\.{0,1}$"
+names: r"^Hello\s*World,\s.+is\s*([\w\s-]*)\swith.*"
+hng id: r"^Hello\s*World,\s.+ID\s(HNG-\d{5})"
+language: r"^Hello\s*World,\s.+using\s(\w+)"
+email = re.match(r'^Hello\sWorld,.*and\s(.*@\w+\.\w+)\.{0,1}$', email)
+name = re.match(r'^Hello\s*World,\s.+is\s([\w\s]+)\swith', email)
+test = re.match(r'', sample)
 print(test.group(1)) if type(test) else print('Failed')
 """
 
-email = "^.+and\s+([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+).*$"
-names = "^Hello\s*World,\sthis\s+is\s+([\w\s-]*)\s+with.*"
-hng_id = "^Hello\s*World,\s.+ID\s(HNG-\d{5})"
-language = "^Hello\s*World,\s.+using\s(\w+)"
-output = "^Hello\sWorld,\s+this\s+is\s+[\w\s-]+with\s+HNGi7\s+ID\s+HNG-\d{5}\s+using\s+\w+\s+for\s+stage\s+2\s+task\s+and\s+[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+[\.|\s]*$"
+email = r"^.+and\s+([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+).*$"
+names = r"^Hello\s*World,\sthis\s+is\s+([\w\s-]*)\s+with.*"
+hng_id = r"^Hello\s*World,\s.+ID\s(HNG-\d{5})"
+language = r"^Hello\s*World,\s.+using\s(\w+)"
+output = r"^Hello\sWorld,\s+this\s+is\s+[\w\s-]+with\s+HNGi7\s+ID\s+HNG-\d{5}" \
+         r"\s+using\s+\w+\s+for\s+stage\s+2\s+task\s+and\s+[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+[\.|\s]*$"
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False

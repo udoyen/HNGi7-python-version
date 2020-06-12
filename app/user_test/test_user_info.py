@@ -3,19 +3,28 @@ from schema import Schema, And, Use, Or, Regex
 import re
 from ..index import check_info, process_users
 
-email_test = "Hello World, this is Idowu Toluwani with HNGi7 ID HNG-04337 using CSharp for stage 2 task and email toluwanieaidowu@gmail.com ."
-name_fail = "Hello World, this is with HNGi7 ID HNG-050709 using PHP for stage 2 task and amusaabiodun88@gmail.com"
-fail_sample = "Hello World, this is Fagoroye George-Ayomide with HNGi7 ID HNG-05#@4 using python for stage 2 task and fagoroyeayomidegmail.com"
-sample = "Hello World, this is Oke George-Kehinde with HNGi7 ID HNG-05678 using Javascript for stage 2 task and okekehinde@gmail.com"
-email = "^.+and\s+([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)[\.|\s]*$"
-names = "^Hello\s*World,\sthis\s+is\s+([\w\s-]*)\s+with.*"
-hng_id = "^Hello\s*World,\s.+ID\s(HNG-\d{5})"
-language = "^Hello\s*World,\s.+using\s(\w+)"
-main_output = "^Hello\sWorld,\s+this\s+is\s+[\w\s-]+with\s+HNGi7\s+ID\s+HNG-\d{5}\s+using\s+\w+\s+for\s+stage\s+2\s+task\s+and\s+[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+[\.|\s]*$"
-main = "Hello World, this is Idowu Toluwani with HNGi7 ID HNG-04337 using CSharp for stage 2 task and email toluwanieaidowu@gmail.com ."
-main2 = "Hello World, this is Onwuka Chidumga with HNGi7 ID HNG-06529 using javascript for stage 2 task and my email is kelvinonwuka8@gmail.com"
-main3 = "\n\nHello World, this is Gabriel Ifgoa with HNGi7 ID 02808 using PHP for stage 2 task and gabrielifoga@yahoo.com"
-name_checker ="Hello World, this is Idris Olubisi with HNGi7 ID HNG-01329 using javascript for stage 2 task and heedris2olubisi@gmail.com"
+email_test = r"Hello World, this is Idowu Toluwani with HNGi7 ID HNG-04337 " \
+             r"using CSharp for stage 2 task and email toluwanieaidowu@gmail.com ."
+name_fail = r"Hello World, this is with HNGi7 ID HNG-050709 using PHP for stage " \
+            r"2 task and amusaabiodun88@gmail.com"
+fail_sample = r"Hello World, this is Fagoroye George-Ayomide with " \
+              r"HNGi7 ID HNG-05#@4 using python for stage 2 task and fagoroyeayomidegmail.com"
+sample = r"Hello World, this is Oke George-Kehinde with HNGi7 ID " \
+         r"HNG-05678 using Javascript for stage 2 task and okekehinde@gmail.com"
+email = r"^.+and\s+([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)[\.|\s]*$"
+names = r"^Hello\s*World,\sthis\s+is\s+([\w\s-]*)\s+with.*"
+hng_id = r"^Hello\s*World,\s.+ID\s(HNG-\d{5})"
+language = r"^Hello\s*World,\s.+using\s(\w+)"
+main_output = r"^Hello\sWorld,\s+this\s+is\s+[\w\s-]+with\s+HNGi7\s+ID\s+HNG-\d{5}" \
+              r"\s+using\s+\w+\s+for\s+stage\s+2\s+task\s+and\s+[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+[\.|\s]*$"
+main = r"Hello World, this is Idowu Toluwani with HNGi7 ID HNG-04337 " \
+       r"using CSharp for stage 2 task and email toluwanieaidowu@gmail.com ."
+main2 = r"Hello World, this is Onwuka Chidumga with HNGi7 ID HNG-06529 " \
+        r"using javascript for stage 2 task and my email is kelvinonwuka8@gmail.com"
+main3 = r"\n\nHello World, this is Gabriel Ifgoa with HNGi7 ID 02808 using " \
+        r"PHP for stage 2 task and gabrielifoga@yahoo.com"
+name_checker = r"Hello World, this is Idris Olubisi with HNGi7 ID " \
+               r"HNG-01329 using javascript for stage 2 task and heedris2olubisi@gmail.com"
 run_command = {
     '.js': 'node',
     '.py': 'python3',
