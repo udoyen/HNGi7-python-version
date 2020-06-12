@@ -4,7 +4,7 @@ import re
 from collections import OrderedDict
 import json
 import itertools
-from flask import Flask, render_template, make_response, request, jsonify
+from flask import Flask, render_template, make_response, request, jsonify, Response
 
 # regex code
 """
@@ -24,13 +24,15 @@ hng_id = "^Hello\s*World,\s.+ID\s(HNG-\d{5})"
 language = "^Hello\s*World,\s.+using\s(\w+)"
 output = "^Hello\sWorld,\s+this\s+is\s+[\w\s-]+with\s+HNGi7\s+ID\s+HNG-\d{5}\s+using\s+\w+\s+for\s+stage\s+2\s+task\s+and\s+[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+[\.|\s]*$"
 
+app = Flask(__name__)
+app.config['JSON_SORT_KEYS'] = False
+app.app_context().push()
 # sample json output
 json_data = []
 
 # return value from function
 output_results = OrderedDict()
 
-app = Flask(__name__)
 
 
 def check_info(test_regex: str, user_output: str) -> str:
@@ -89,24 +91,24 @@ def process_users() -> list:
             print('Output Str: {}'.format(proc_str[0]), flush=True)
             # Unpack the list of dict created earlier
             # and append them to the json_data list
-            json_data.append(*[OrderedDict({
-                'file': f,
-                'output': proc_str[0],
-                'email': check_info(email, proc_str[0]),
-                'fullname': check_info(names, proc_str[0]),
-                'HNGId': check_info(hng_id, proc_str[0]),
-                'language': check_info(language, proc_str[0]),
-                'status': 'Fail'
-            }) if check_info(output, proc_str[0]) == '' or check_info(email, proc_str[0]) == '' else
-                               OrderedDict({
-                                   'file': f,
-                                   'output': proc_str[0],
-                                   'email': check_info(email, proc_str[0]),
-                                   'fullname': check_info(names, proc_str[0]),
-                                   'HNGId': check_info(hng_id, proc_str[0]),
-                                   'language': check_info(language, proc_str[0]),
-                                   'status': 'Pass'
-                               })])
+            json_data.append(*[OrderedDict([
+                ('file', f),
+                ('output', proc_str[0]),
+                ('email', check_info(email, proc_str[0])),
+                ('fullname', check_info(names, proc_str[0])),
+                ('HNGId', check_info(hng_id, proc_str[0])),
+                ('language', check_info(language, proc_str[0])),
+                ('status', 'Fail')
+            ]) if check_info(output, proc_str[0]) == '' or check_info(email, proc_str[0]) == '' else
+                               OrderedDict([
+                                   ('file', f),
+                                   ('output', proc_str[0]),
+                                   ('email', check_info(email, proc_str[0])),
+                                   ('fullname', check_info(names, proc_str[0])),
+                                   ('HNGId', check_info(hng_id, proc_str[0])),
+                                   ('language', check_info(language, proc_str[0])),
+                                   ('status', 'Pass')
+                               ])])
     except TypeError as t_err:
         print('Error: {}'.format(t_err))
     except ValueError as v_err:
@@ -127,6 +129,20 @@ def process_users() -> list:
     return json_data
 
 
+def stream_template(template_name, **context):
+    """
+    Helps to stream template response
+    :param template_name:
+    :param context:
+    :return:
+    """
+    app.update_template_context(context)
+    t = app.jinja_env.get_template(template_name)
+    rv = t.stream(context)
+    # rv.enable_buffering(5)
+    return rv
+
+
 @app.route('/', methods=['GET'])
 @app.route('/home', methods=['GET'])
 @app.route('/index', methods=['GET'])
@@ -135,11 +151,23 @@ def index():
     Landing page function
     :return: either a json response or the index.html page
     """
-    data = process_users()
+    data = process_users().__iter__()
+    # app.app_context().push()
     if 'json' in request.args:
-        return jsonify(data)
+        def generate():
+            try:
+                prev_release = next(data)
+            except StopIteration:
+                yield '[]'
+                raise StopIteration
+            yield '['
+            for item in data:
+                yield json.dumps(prev_release) + ', '
+                prev_release = item
+            yield json.dumps(prev_release) + ']'
+        return Response(generate(), content_type='application/json')
     else:
-        return render_template('index.html', data=data)
+        return Response(stream_template('index.html', data=data))
 
 
 @app.errorhandler(404)
