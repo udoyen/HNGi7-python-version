@@ -5,6 +5,7 @@ from flask import render_template
 
 from ..index import app, process_users
 data = process_users()
+files = data[2]
 
 
 class MyTestCase(unittest.TestCase):
@@ -44,7 +45,7 @@ class MyTestCase(unittest.TestCase):
         self.assertTrue(re.search(r'Error.*Files.*{}'.format(data), txt, re.MULTILINE))
 
     def test_check_files_count(self):
-        files = data[2]
+        # files = data[2]
         with app.test_client() as c:
             rc = c.get('/')
         txt = rc.get_data(as_text=True)

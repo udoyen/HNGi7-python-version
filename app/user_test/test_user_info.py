@@ -50,9 +50,9 @@ class MyTestCase(unittest.TestCase):
 
     def test_process_users(self):
         ls = process_users()
-        validated = schema.validate(ls[:200])
-        self.assertIsInstance(ls, list)
-        self.assertIsInstance(ls[0], dict)
+        validated = schema.validate(ls[0][:200])
+        self.assertIsInstance(ls[0], list)
+        self.assertIsInstance(ls[0][0], dict)
         self.assertTrue(validated)
 
     def test_main_pass(self):
