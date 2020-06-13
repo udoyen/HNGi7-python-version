@@ -1,8 +1,10 @@
 import unittest
+import re
 import json
 from flask import render_template
 
-from ..index import app
+from ..index import app, process_users
+data = process_users()
 
 
 class MyTestCase(unittest.TestCase):
@@ -26,15 +28,42 @@ class MyTestCase(unittest.TestCase):
     def test_index_page(self):
         with app.test_client() as c:
             rx = c.get('/')
-            rc = c.get('/home')
-            rv = c.get('/index')
 
         assert rx.status_code == 200
-        assert rc.status_code == 200
-        assert rv.status_code == 200
         assert 'HNGi7 Team Granite' in rx.get_data(as_text=True)
-        assert 'HNGi7 Team Granite' in rc.get_data(as_text=True)
+
+    def test_check_error_files_count(self):
+        global data
+        data = data[1]
+        with app.test_client() as c:
+            rc = c.get('/')
+        txt = rc.get_data(as_text=True)
+        assert rc.status_code == 200
+        print('Txt: {}'.format(txt))
+        print('Glo_fail_count: {}'.format(data))
+        self.assertTrue(re.search(r'Error.*Files.*{}'.format(data), txt, re.MULTILINE))
+
+    def test_check_files_count(self):
+        files = data[2]
+        with app.test_client() as c:
+            rc = c.get('/')
+        txt = rc.get_data(as_text=True)
+        assert rc.status_code == 200
+        self.assertTrue(re.search(fr"Total.*Files.*{len(files)}", txt, re.MULTILINE))
+
+    def test_index_page_url_index(self):
+        with app.test_client() as c:
+            rv = c.get('/index')
+
+        assert rv.status_code == 200
         assert 'HNGi7 Team Granite' in rv.get_data(as_text=True)
+
+    def test_index_page_url_home(self):
+        with app.test_client() as c:
+            rc = c.get('/home')
+
+        assert rc.status_code == 200
+        assert 'HNGi7 Team Granite' in rc.get_data(as_text=True)
 
     def test_index_with_url_request_strings(self):
         with app.test_client() as c:

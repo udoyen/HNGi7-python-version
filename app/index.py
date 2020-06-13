@@ -33,6 +33,11 @@ json_data = []
 
 # return value from function
 output_results = OrderedDict()
+files = None
+# error_files = None
+glo_fail_count = 0
+data = ()
+error_files = []
 
 
 def check_info(test_regex: str, user_output: str) -> str:
@@ -52,10 +57,10 @@ def check_info(test_regex: str, user_output: str) -> str:
         return ''
 
 
-def process_users() -> list:
+def process_users() -> tuple:
     """
     Used to process user scripts
-    :return (list): Tuple of list of failures and dict of all data
+    :return (tuple): Tuple of list of failures, dict of all data and processed file count
     """
     run_command = {
         '.js': 'node',
@@ -72,8 +77,11 @@ def process_users() -> list:
     dir_name = os.path.dirname(__file__)
     r_path = os.path.realpath(dir_name + '/scripts')
     target = r_path
-    counter = itertools.count(0)
+
     try:
+        global files
+        global error_files
+        global glo_fail_count
         # Get files in scripts folder
         files = [f for f in os.listdir(target) if os.path.isfile(os.path.join(target, f))]
         for f in files:
@@ -119,14 +127,28 @@ def process_users() -> list:
         print('Error: {}'.format(sc_err))
     except Exception as e_err:
         print('Error Type: {}, msg: {}'.format(type(e_err), e_err))
-    # finally:
-    error_files = [next(counter, i) for i in json_data if i['status'] == 'Fail']
+    finally:
+        error_files = [i for i, item in enumerate(json_data) if item['status'] == 'Fail']
+        if glo_fail_count == 0:
+            glo_fail_count = len(error_files)
     print('json_data items: {}'.format(json.dumps(json_data, indent=4)))
-    print('Files processed: {}'.format(len(files)), 'Script Success: {}'.format(len(files) - error_files[-1]),
-          'Script Fails: {}'.format(error_files[-1]), sep='\n')
+    print('Files processed: {}'.format(len(files)), 'Script Success: {}'.format(len(files) - len(error_files)),
+          'Script Fails: {}'.format(glo_fail_count), sep='\n')
     print('JavaScripts count: {}'.format(lang_count['.js']), 'Java count: {}'.format(lang_count['.java']),
           'Php count: {}'.format(lang_count['.php']), 'Python count: {}'.format(lang_count['.py']))
-    return json_data
+    return json_data, glo_fail_count, files
+
+
+@app.before_request
+def helper_function():
+    """
+    Function that processes user script
+    before the main request is made
+    :return:
+    """
+    print("Before request is running")
+    global data
+    data = process_users()
 
 
 def stream_template(template_name, **context):
@@ -152,7 +174,9 @@ def index():
     Landing page function
     :return: either a json response or the index.html page
     """
-    data = process_users().__iter__()
+    # data = process_users()
+    global data
+    data = data[0].__iter__()
 
     if 'json' in request.args:
         def generate():
@@ -182,7 +206,9 @@ def index():
 
         return Response(generate(), content_type='application/json')
     else:
-        return Response(stream_template('index.html', data=data))
+        p_count = len(files) - glo_fail_count
+        return Response(
+            stream_template('index.html', data=data, s_count=len(files), f_count=glo_fail_count, p_count=p_count))
 
 
 @app.errorhandler(404)
